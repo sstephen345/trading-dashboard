@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+from strategy.baseline_v1 import run_baseline_v1
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -8,69 +10,69 @@ st.set_page_config(
     layout="centered"
 )
 
-now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
-current_time = now_ist.strftime("%d %b %Y, %I:%M:%S %p IST")
-
 st.title("📈 Stephen Trading Dashboard")
-st.caption("Mobile-first intraday forward test system")
+st.caption("Mobile-first intraday trading research platform")
 
 st.divider()
 
-st.subheader("🟢 System Status")
-st.success("App online")
-st.write(f"Current Time: **{current_time}**")
-st.write("Mode: **Paper Test**")
+now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+st.success("🟢 System Online")
+st.write(f"Current IST Time: **{now_ist.strftime('%d %b %Y, %I:%M:%S %p')}**")
 
 st.divider()
 
-st.subheader("📊 Strategy")
-st.info("V1.1 Candidate – ATR Breakout + EMA 0.5 Filter")
+st.subheader("📂 Upload Dataset Once")
 
-st.write("Market: **BANKNIFTY / NIFTY**")
-st.write("Signal Time: **After 9:40 AM IST**")
-st.write("Trade Limit: **One trade per day**")
+uploaded_file = st.file_uploader(
+    "Upload your 1-minute Excel file",
+    type=["xlsx"]
+)
+
+if uploaded_file is not None:
+    df = pd.read_excel(uploaded_file)
+
+    summary, trade_log = run_baseline_v1(df)
+
+    st.session_state["data_loaded"] = True
+    st.session_state["df"] = df
+    st.session_state["summary"] = summary
+    st.session_state["trade_log"] = trade_log
+
+    st.success("✅ Data loaded and Baseline V1.0 completed")
+
+    st.divider()
+
+    st.subheader("📌 Baseline V1.0 Summary")
+
+    col1, col2 = st.columns(2)
+    col1.metric("Trades", summary["trades"])
+    col2.metric("Win Rate", f'{summary["win_rate"]}%')
+
+    col3, col4 = st.columns(2)
+    col3.metric("Net Points", summary["net_points"])
+    col4.metric("Profit Factor", summary["profit_factor"])
+
+    col5, col6 = st.columns(2)
+    col5.metric("Max DD", summary["max_drawdown"])
+    col6.metric("CE / PE", f'{summary["ce_trades"]} / {summary["pe_trades"]}')
+
+    st.divider()
+
+    st.subheader("📈 Equity Curve")
+    trade_log["equity"] = trade_log["points"].cumsum()
+    st.line_chart(trade_log["equity"])
+
+else:
+    st.warning("Upload Excel file to activate the dashboard.")
 
 st.divider()
 
-st.subheader("🎯 Today's Signal")
-st.warning("⚪ Waiting for market data")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Entry", "-")
-col2.metric("SL", "-")
-col3.metric("Target", "-")
-
-st.write("Reason: **Live data not connected yet**")
-
-st.divider()
-
-st.subheader("📌 Backtest Reference")
-
-col1, col2 = st.columns(2)
-col1.metric("Win Rate", "44.13%")
-col2.metric("Profit Factor", "1.595")
-
-col3, col4 = st.columns(2)
-col3.metric("Net Points", "+4,637.75")
-col4.metric("Max Drawdown", "-550 pts")
-
-st.divider()
-
-st.subheader("📒 Paper Test Log")
-col1, col2, col3 = st.columns(3)
-col1.metric("Trades", "0")
-col2.metric("Wins", "0")
-col3.metric("Losses", "0")
-
-st.caption("Trade logging will be added in the next versions.")
-
-st.divider()
-
-st.subheader("🚧 Roadmap")
+st.subheader("🚀 Project Status")
 st.write("✅ GitHub setup complete")
-st.write("✅ Streamlit app deployed")
-st.write("✅ Dashboard layout added")
-st.write("🔜 Historical replay")
-st.write("🔜 Excel data upload")
-st.write("🔜 Live market data")
-st.write("🔜 Telegram alerts")
+st.write("✅ Streamlit cloud app live")
+st.write("✅ Baseline V1.0 verified")
+st.write("✅ Equity curve added")
+st.write("✅ Daily and monthly statistics added")
+st.write("🔜 Shared data across all pages")
+st.write("🔜 Replay mode")
+st.write("🔜 Forward test")
