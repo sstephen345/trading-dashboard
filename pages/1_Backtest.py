@@ -8,7 +8,6 @@ st.write("Upload your 1-minute Excel file to validate the data.")
 
 REQUIRED_COLUMNS = [
     "date",
-    "time",
     "open",
     "high",
     "low",
@@ -28,6 +27,8 @@ if uploaded_file is not None:
 
     st.success("✅ File uploaded successfully!")
 
+    columns_lower = [str(c).strip().lower() for c in df.columns]
+
     st.subheader("📋 Data Summary")
 
     col1, col2 = st.columns(2)
@@ -36,14 +37,10 @@ if uploaded_file is not None:
 
     st.subheader("✅ Data Health Check")
 
-    columns_lower = [str(c).strip().lower() for c in df.columns]
-    required_lower = [c.lower() for c in REQUIRED_COLUMNS]
-
-    missing_cols = [
-        REQUIRED_COLUMNS[i]
-        for i, col in enumerate(required_lower)
-        if col not in columns_lower
-    ]
+    missing_cols = []
+    for required in REQUIRED_COLUMNS:
+        if required.lower() not in columns_lower:
+            missing_cols.append(required)
 
     if len(missing_cols) == 0:
         st.success("✅ Required columns: OK")
@@ -58,19 +55,32 @@ if uploaded_file is not None:
     else:
         st.warning(f"⚠️ Missing values found: {missing_values}")
 
-    st.subheader("📅 Date Range")
+    st.subheader("📅 Date & Time Handling")
 
     if "date" in columns_lower:
         date_col = df.columns[columns_lower.index("date")]
+
         try:
-            dates = pd.to_datetime(df[date_col])
-            st.write(f"Start Date: **{dates.min().date()}**")
-            st.write(f"End Date: **{dates.max().date()}**")
-            st.write(f"Trading Days: **{dates.dt.date.nunique()}**")
-        except Exception:
-            st.warning("Could not read date column properly.")
+            datetime_values = pd.to_datetime(df[date_col])
+
+            df["Date_Only"] = datetime_values.dt.date
+            df["Time_Only"] = datetime_values.dt.time
+
+            st.success("✅ Date/Time column detected successfully.")
+            st.info("ℹ️ Separate Date and Time fields created automatically.")
+
+            st.write(f"Start Date: **{datetime_values.min().date()}**")
+            st.write(f"End Date: **{datetime_values.max().date()}**")
+            st.write(f"Trading Days: **{datetime_values.dt.date.nunique()}**")
+
+            st.write(f"Start Time: **{datetime_values.min().time()}**")
+            st.write(f"End Time: **{datetime_values.max().time()}**")
+
+        except Exception as e:
+            st.error("❌ Could not read the Date column as datetime.")
+            st.write(str(e))
     else:
-        st.warning("Date column not found.")
+        st.error("❌ Date column not found.")
 
     st.subheader("📌 Columns Found")
     st.write(list(df.columns))
