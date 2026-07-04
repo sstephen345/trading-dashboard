@@ -3,6 +3,7 @@ import pandas as pd
 SL_POINTS = 50
 TARGET_POINTS = 100
 ENTRY_TIME = "09:40:00"
+EOD_EXIT_TIME = "15:15:00"
 
 
 def run_baseline_v1(df):
@@ -11,14 +12,14 @@ def run_baseline_v1(df):
 
     df["datetime"] = pd.to_datetime(df["date"])
     df["trade_date"] = df["datetime"].dt.date
-    df["trade_time"] = df["datetime"].dt.time
+    df["trade_time_str"] = df["datetime"].dt.strftime("%H:%M:%S")
 
     trades = []
 
     for trade_date, day in df.groupby("trade_date"):
         day = day.sort_values("datetime").reset_index(drop=True)
 
-        signal_rows = day[day["datetime"].dt.strftime("%H:%M:%S") >= ENTRY_TIME]
+        signal_rows = day[day["trade_time_str"] >= ENTRY_TIME]
 
         if signal_rows.empty:
             continue
@@ -68,11 +69,17 @@ def run_baseline_v1(df):
             sl = entry + SL_POINTS
             target = entry - TARGET_POINTS
 
-        exit_price = day.iloc[-1]["close"]
-        exit_time = day.iloc[-1]["datetime"]
+        eod_rows = day[day["trade_time_str"] <= EOD_EXIT_TIME]
+        eod_row = eod_rows.iloc[-1]
+
+        exit_price = eod_row["close"]
+        exit_time = eod_row["datetime"]
         result = "EOD"
 
-        future = day.iloc[trade["entry_index"] + 1 :]
+        future = day[
+            (day.index > trade["entry_index"])
+            & (day["trade_time_str"] <= EOD_EXIT_TIME)
+        ]
 
         for _, r in future.iterrows():
             if trade["type"] == "CE":
@@ -107,13 +114,12 @@ def run_baseline_v1(df):
                     result = "TARGET"
                     break
 
-        if trade["type"] == "CE":
-            points = exit_price - entry
-        else:
-            points = entry - exit_price
+        points = exit_price - entry if trade["type"] == "CE" else entry - exit_price
 
         trade.update(
             {
+                "sl": sl,
+                "target": target,
                 "exit_time": exit_time,
                 "exit_price": exit_price,
                 "result": result,
@@ -130,6 +136,8 @@ def run_baseline_v1(df):
 
     wins = (trade_log["points"] > 0).sum()
     losses = (trade_log["points"] < 0).sum()
+    eod_exits = (trade_log["result"] == "EOD").sum()
+
     gross_profit = trade_log.loc[trade_log["points"] > 0, "points"].sum()
     gross_loss = abs(trade_log.loc[trade_log["points"] < 0, "points"].sum())
 
@@ -140,9 +148,10 @@ def run_baseline_v1(df):
         "trades": len(trade_log),
         "wins": int(wins),
         "losses": int(losses),
+        "eod_exits": int(eod_exits),
         "win_rate": round(wins / len(trade_log) * 100, 2),
         "net_points": round(trade_log["points"].sum(), 2),
-        "profit_factor": round(gross_profit / gross_loss, 3) if gross_loss else 0,
+        "profit_factor": round(gross_profit / gross_loss, 3),
         "max_drawdown": round(drawdown.min(), 2),
         "ce_trades": int((trade_log["type"] == "CE").sum()),
         "pe_trades": int((trade_log["type"] == "PE").sum()),
