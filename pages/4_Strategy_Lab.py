@@ -20,11 +20,13 @@ target_points = st.number_input("Target Points", value=100, step=5)
 st.info("Entry rules are same as Baseline V1.0. Only SL and Target are adjustable in this version.")
 
 if st.button("▶️ Run Strategy Test"):
-    from strategy.baseline_v1 import run_baseline_v1
-
+    from strategy.flexible_engine import run_flexible_strategy
     # For now, Strategy Lab confirms baseline engine connection.
     # Next version will pass SL/Target into a flexible engine.
-    summary, trade_log = run_baseline_v1(df)
+    summary, trade_log = run_flexible_strategy(
+    df,
+    sl_points=sl_points,
+    target_points=target_points
 
     st.subheader("📌 Result")
 
