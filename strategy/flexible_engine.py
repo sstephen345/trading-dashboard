@@ -23,7 +23,7 @@ def run_flexible_strategy(
     baseline.TARGET_POINTS = old_target
 
     if trade_log.empty:
-        return summary, trade_log
+        return {}, trade_log
 
     if not allow_ce:
         trade_log = trade_log[trade_log["type"] != "CE"]
@@ -31,20 +31,11 @@ def run_flexible_strategy(
     if not allow_pe:
         trade_log = trade_log[trade_log["type"] != "PE"]
 
-    if ema_filter_enabled:
-        if "entry_ema_slope" in trade_log.columns:
-            trade_log = trade_log[
-                ((trade_log["type"] == "CE") & (trade_log["entry_ema_slope"] >= ema_threshold))
-                | ((trade_log["type"] == "PE") & (trade_log["entry_ema_slope"] <= -ema_threshold))
-            ]
-
-    if trade_log.empty:
-        return {}, trade_log
-
     wins = (trade_log["points"] > 0).sum()
     losses = (trade_log["points"] < 0).sum()
     gross_profit = trade_log.loc[trade_log["points"] > 0, "points"].sum()
     gross_loss = abs(trade_log.loc[trade_log["points"] < 0, "points"].sum())
+
     equity = trade_log["points"].cumsum()
     drawdown = equity - equity.cummax()
 
