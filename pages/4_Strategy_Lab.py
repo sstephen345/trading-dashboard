@@ -46,6 +46,24 @@ with st.expander("📈 Entry Filters", expanded=True):
         value=0.0,
         step=0.1,
     )
+    
+    rsi_filter_enabled = st.checkbox("Enable RSI Filter", value=False)
+
+    rsi_min = st.number_input(
+        "RSI Minimum",
+        min_value=0.0,
+        max_value=100.0,
+        value=40.0,
+        step=1.0,
+    )
+
+    rsi_max = st.number_input(
+        "RSI Maximum",
+        min_value=0.0,
+        max_value=100.0,
+        value=70.0,
+        step=1.0,
+    )
 
 with st.expander("⚙️ Risk Management", expanded=True):
     sl_points = st.number_input(
@@ -79,6 +97,9 @@ if st.button("▶️ Run Single Test"):
         atr_threshold=atr_threshold,
         gamma_filter_enabled=gamma_filter_enabled,
         gamma_threshold=gamma_threshold,
+        rsi_filter_enabled=rsi_filter_enabled,
+        rsi_min=rsi_min,
+        rsi_max=rsi_max,
     )
 
     if not summary:
@@ -145,6 +166,9 @@ with st.expander("🧠 SL / Target Optimizer", expanded=False):
                     atr_threshold=atr_threshold,
                     gamma_filter_enabled=gamma_filter_enabled,
                     gamma_threshold=gamma_threshold,
+                     rsi_filter_enabled=rsi_filter_enabled,
+                     rsi_min=rsi_min,
+                     rsi_max=rsi_max,
                 )
 
                 if summary:
