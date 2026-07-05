@@ -3,10 +3,15 @@ import pandas as pd
 from datetime import datetime
 from strategy.flexible_engine import run_flexible_strategy
 
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
 st.set_page_config(page_title="Live Scanner", page_icon="📡")
 
 st.title("📡 Live Scanner / Paper Trading")
-st.write("Prepare live signal monitoring and paper trade logging. No real orders are placed.")
+st.write("Demo live-data scanner using Yahoo Finance. No real orders are placed.")
 
 if "df" not in st.session_state:
     st.warning("Please upload Excel from Dashboard first.")
@@ -33,7 +38,56 @@ rsi_filter_enabled = st.checkbox("Enable RSI Filter", value=False)
 rsi_min = st.number_input("RSI Minimum", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
 rsi_max = st.number_input("RSI Maximum", min_value=0.0, max_value=100.0, value=100.0, step=1.0)
 
-st.subheader("🧪 Paper Test Simulation")
+st.subheader("🌐 Demo Live Feed")
+
+symbol = st.selectbox(
+    "Yahoo Symbol",
+    ["^NSEI", "^NSEBANK", "RELIANCE.NS", "SBIN.NS", "TCS.NS"]
+)
+
+interval = st.selectbox("Interval", ["1m", "5m", "15m"], index=0)
+period = st.selectbox("Period", ["1d", "5d"], index=0)
+
+if st.button("🔄 Fetch Demo Live Data"):
+
+    if yf is None:
+        st.error("yfinance is not installed. Add yfinance to requirements.txt and reboot app.")
+        st.stop()
+
+    try:
+        live_df = yf.download(
+            symbol,
+            period=period,
+            interval=interval,
+            progress=False,
+            auto_adjust=False,
+        )
+
+        if live_df.empty:
+            st.error("No data received from Yahoo Finance.")
+            st.stop()
+
+        live_df = live_df.reset_index()
+        st.success(f"✅ Data fetched for {symbol}")
+
+        st.subheader("📊 Latest Candles")
+        st.dataframe(live_df.tail(20), use_container_width=True, hide_index=True)
+
+        latest = live_df.iloc[-1]
+
+        st.subheader("📡 Current Market Snapshot")
+        col1, col2 = st.columns(2)
+        col1.metric("Latest Close", round(float(latest["Close"]), 2))
+        col2.metric("Latest Time", str(latest.iloc[0]))
+
+        st.info("This is only demo market data. Strategy signal calculation will be connected next.")
+
+    except Exception as e:
+        st.error(f"Yahoo feed error: {e}")
+
+st.divider()
+
+st.subheader("🧪 Paper Test on Uploaded Dataset")
 
 if st.button("▶️ Run Paper Test on Uploaded Data"):
 
@@ -76,35 +130,25 @@ if st.button("▶️ Run Paper Test on Uploaded Data"):
     st.subheader("📋 Paper Trade Log")
     st.dataframe(trade_log, use_container_width=True, hide_index=True)
 
-    csv = trade_log.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        "⬇️ Download Paper Trade Log",
-        data=csv,
-        file_name="paper_trade_log.csv",
-        mime="text/csv",
-    )
-
 st.divider()
 
 st.subheader("📡 Live Status")
 
 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-st.info("Live market feed is not connected yet.")
 st.write(f"Last dashboard refresh: **{now}**")
 
 st.write("Current stage:")
 st.write("✅ Strategy selected")
 st.write("✅ Paper trade structure ready")
-st.write("⬜ Live data feed")
+st.write("✅ Yahoo demo live feed")
+st.write("⬜ Live signal calculation")
 st.write("⬜ Telegram alert")
 st.write("⬜ Angel One connection")
 st.write("⬜ Real order execution")
 
 st.subheader("🚨 Signal Box")
-
-st.warning("No live signal yet. Live feed connection is the next development step.")
+st.warning("Signal calculation will be connected in the next step.")
 
 st.subheader("📋 Forward Test Rules")
 
@@ -118,6 +162,7 @@ rules = {
     "RSI Min": rsi_min,
     "RSI Max": rsi_max,
     "Mode": "Paper Trading Only",
+    "Data Feed": "Yahoo Finance Demo",
 }
 
 st.json(rules)
