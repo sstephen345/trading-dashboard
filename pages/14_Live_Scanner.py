@@ -14,20 +14,11 @@ st.set_page_config(page_title="Live Scanner", page_icon="📡")
 st.title("📡 Live Signal Engine")
 st.write("Live scanner with signal history. No real orders are placed.")
 
-if "df" not in st.session_state:
-    st.warning("Please upload Excel from Dashboard first.")
-    st.stop()
-
 if "signal_history" not in st.session_state:
     st.session_state["signal_history"] = []
 
 if "last_signal_candle" not in st.session_state:
     st.session_state["last_signal_candle"] = None
-
-df = st.session_state["df"].copy()
-df["date"] = pd.to_datetime(df["date"])
-
-st.success("✅ Dataset loaded from Dashboard")
 
 st.subheader("📌 Active Strategy")
 
@@ -266,46 +257,52 @@ st.divider()
 
 st.subheader("🧪 Paper Test on Uploaded Dataset")
 
-if st.button("▶️ Run Paper Test on Uploaded Data"):
+if "df" not in st.session_state:
+    st.info("Upload Excel from Dashboard to enable historical paper test.")
+else:
+    df = st.session_state["df"].copy()
+    df["date"] = pd.to_datetime(df["date"])
 
-    summary, trade_log = run_flexible_strategy(
-        df,
-        sl_points=sl_points,
-        target_points=target_points,
-        allow_ce=allow_ce,
-        allow_pe=allow_pe,
-        ema_filter_enabled=ema_filter_enabled,
-        ema_threshold=ema_threshold,
-        rsi_filter_enabled=rsi_filter_enabled,
-        rsi_min=rsi_min,
-        rsi_max=rsi_max,
-    )
+    if st.button("▶️ Run Paper Test on Uploaded Data"):
 
-    if not summary:
-        st.error("No trades found for selected setup.")
-        st.stop()
+        summary, trade_log = run_flexible_strategy(
+            df,
+            sl_points=sl_points,
+            target_points=target_points,
+            allow_ce=allow_ce,
+            allow_pe=allow_pe,
+            ema_filter_enabled=ema_filter_enabled,
+            ema_threshold=ema_threshold,
+            rsi_filter_enabled=rsi_filter_enabled,
+            rsi_min=rsi_min,
+            rsi_max=rsi_max,
+        )
 
-    st.subheader("📊 Paper Test Result")
+        if not summary:
+            st.error("No trades found for selected setup.")
+            st.stop()
 
-    col1, col2 = st.columns(2)
-    col1.metric("Trades", summary["trades"])
-    col2.metric("Win Rate", f'{summary["win_rate"]}%')
+        st.subheader("📊 Paper Test Result")
 
-    col3, col4 = st.columns(2)
-    col3.metric("Net Points", summary["net_points"])
-    col4.metric("Profit Factor", summary["profit_factor"])
+        col1, col2 = st.columns(2)
+        col1.metric("Trades", summary["trades"])
+        col2.metric("Win Rate", f'{summary["win_rate"]}%')
 
-    col5, col6 = st.columns(2)
-    col5.metric("Max DD", summary["max_drawdown"])
-    col6.metric("CE / PE", f'{summary["ce_trades"]} / {summary["pe_trades"]}')
+        col3, col4 = st.columns(2)
+        col3.metric("Net Points", summary["net_points"])
+        col4.metric("Profit Factor", summary["profit_factor"])
 
-    trade_log["equity"] = trade_log["points"].cumsum()
+        col5, col6 = st.columns(2)
+        col5.metric("Max DD", summary["max_drawdown"])
+        col6.metric("CE / PE", f'{summary["ce_trades"]} / {summary["pe_trades"]}')
 
-    st.subheader("📈 Paper Equity Curve")
-    st.line_chart(trade_log["equity"])
+        trade_log["equity"] = trade_log["points"].cumsum()
 
-    st.subheader("📋 Paper Trade Log")
-    st.dataframe(trade_log, use_container_width=True, hide_index=True)
+        st.subheader("📈 Paper Equity Curve")
+        st.line_chart(trade_log["equity"])
+
+        st.subheader("📋 Paper Trade Log")
+        st.dataframe(trade_log, use_container_width=True, hide_index=True)
 
 st.divider()
 
