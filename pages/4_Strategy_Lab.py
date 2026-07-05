@@ -50,6 +50,16 @@ if st.button("▶️ Run Single Test"):
 with st.expander("🧠 SL / Target Optimizer", expanded=False):
     st.write("Keep ranges small first, because this runs many backtests.")
 
+    ranking_method = st.selectbox(
+        "Rank optimizer results by",
+        [
+            "Profit Factor",
+            "Net Points",
+            "Win Rate %",
+            "Lowest Drawdown",
+        ]
+    )
+
     sl_from = st.number_input("SL From", min_value=5, max_value=200, value=10, step=5)
     sl_to = st.number_input("SL To", min_value=5, max_value=200, value=50, step=5)
     sl_step = st.number_input("SL Step", min_value=5, max_value=50, value=5, step=5)
@@ -100,14 +110,32 @@ with st.expander("🧠 SL / Target Optimizer", expanded=False):
             st.error("No results found.")
             st.stop()
 
-        results_df = results_df.sort_values(
-            by=["Profit Factor", "Net Points"],
-            ascending=[False, False]
-        ).reset_index(drop=True)
+        if ranking_method == "Profit Factor":
+            results_df = results_df.sort_values(
+                by=["Profit Factor", "Net Points"],
+                ascending=[False, False]
+            )
+        elif ranking_method == "Net Points":
+            results_df = results_df.sort_values(
+                by=["Net Points", "Profit Factor"],
+                ascending=[False, False]
+            )
+        elif ranking_method == "Win Rate %":
+            results_df = results_df.sort_values(
+                by=["Win Rate %", "Profit Factor"],
+                ascending=[False, False]
+            )
+        elif ranking_method == "Lowest Drawdown":
+            results_df["Drawdown Abs"] = results_df["Max DD"].abs()
+            results_df = results_df.sort_values(
+                by=["Drawdown Abs", "Profit Factor"],
+                ascending=[True, False]
+            ).drop(columns=["Drawdown Abs"])
 
+        results_df = results_df.reset_index(drop=True)
         results_df.insert(0, "Rank", results_df.index + 1)
 
-        st.subheader("🏆 Optimizer Results")
+        st.subheader(f"🏆 Optimizer Results - Ranked by {ranking_method}")
         st.dataframe(results_df, use_container_width=True, hide_index=True)
 
         st.subheader("🥇 Best Setup")
