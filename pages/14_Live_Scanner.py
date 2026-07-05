@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from strategy.flexible_engine import run_flexible_strategy
+from strategy.live_indicators import build_live_indicator_table
 
 try:
     import yfinance as yf
@@ -68,27 +69,116 @@ if st.button("🔄 Fetch Demo Live Data"):
             st.stop()
 
         live_df = live_df.reset_index()
-        st.success(f"✅ Data fetched for {symbol}")
 
-        st.subheader("📊 Latest Candles")
-        st.dataframe(live_df.tail(20), use_container_width=True, hide_index=True)
+        if isinstance(live_df.columns, pd.MultiIndex):
+            live_df.columns = [
+                col[0] if col[0] else col[1]
+                for col in live_df.columns
+            ]
 
-        latest = live_df.iloc[-1]
+        indicator_df = build_live_indicator_table(live_df)
+
+        st.success(f"✅ Live indicator table built for {symbol}")
+
+        latest = indicator_df.iloc[-1]
 
         st.subheader("📡 Current Market Snapshot")
-        col1, col2 = st.columns(2)
-        col1.metric("Latest Close", round(float(latest["Close"]), 2))
-        close_value = latest["Close"]
-        
-        if isinstance(close_value, pd.Series):
-            close_value = close_value.iloc[0]
-        
-        col1.metric("Latest Close", round(float(close_value), 2))
 
-        st.info("This is only demo market data. Strategy signal calculation will be connected next.")
+        col1, col2 = st.columns(2)
+        col1.metric("Latest Close", round(float(latest["close"]), 2))
+        col2.metric("Current Signal", latest["Signal"])
+
+        col3, col4 = st.columns(2)
+        col3.metric("EMA Slope", round(float(latest["EMA_Slope"]), 3))
+        col4.metric("RSI14", round(float(latest["RSI14"]), 2))
+
+        col5, col6 = st.columns(2)
+        col5.metric("ATR Slope", round(float(latest["ATR_Slope"]), 3))
+        col6.metric("Gamma", round(float(latest["Gamma_Momentum"]), 3))
+
+        st.subheader("🧠 Live Rule Check")
+
+        ce_ok = (
+            allow_ce
+            and latest["ATR_Slope"] > 0
+            and latest["Gamma_Momentum"] > 0
+            and latest["EMA_Slope"] > 0
+            and latest["close"] > latest["EMA20"]
+        )
+
+        pe_ok = (
+            allow_pe
+            and latest["ATR_Slope"] > 0
+            and latest["Gamma_Momentum"] < 0
+            and latest["EMA_Slope"] < 0
+            and latest["close"] < latest["EMA20"]
+        )
+
+        if ema_filter_enabled:
+            ce_ok = ce_ok and latest["EMA_Slope"] >= ema_threshold
+            pe_ok = pe_ok and latest["EMA_Slope"] <= -ema_threshold
+
+        if rsi_filter_enabled:
+            ce_ok = ce_ok and rsi_min <= latest["RSI14"] <= rsi_max
+            pe_ok = pe_ok and rsi_min <= latest["RSI14"] <= rsi_max
+
+        if ce_ok:
+            signal = "BUY CE"
+            entry = float(latest["close"])
+            sl = entry - sl_points
+            target = entry + target_points
+            st.success("🟢 BUY CE Signal")
+
+        elif pe_ok:
+            signal = "BUY PE"
+            entry = float(latest["close"])
+            sl = entry + sl_points
+            target = entry - target_points
+            st.error("🔴 BUY PE Signal")
+
+        else:
+            signal = "NO TRADE"
+            entry = None
+            sl = None
+            target = None
+            st.warning("⚪ NO TRADE")
+
+        st.subheader("🚨 Signal Box")
+
+        if signal != "NO TRADE":
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Entry", round(entry, 2))
+            col2.metric("SL", round(sl, 2))
+            col3.metric("Target", round(target, 2))
+        else:
+            st.write("Conditions not satisfied.")
+
+        st.subheader("📊 Latest Indicator Table")
+        display_cols = [
+            "datetime",
+            "open",
+            "high",
+            "low",
+            "close",
+            "EMA20",
+            "EMA_Slope",
+            "RSI14",
+            "ATR14",
+            "ATR_Slope",
+            "VWAP",
+            "Gamma_Momentum",
+            "Trend",
+            "Signal",
+        ]
+
+        st.dataframe(
+            indicator_df[display_cols].tail(30),
+            use_container_width=True,
+            hide_index=True
+        )
 
     except Exception as e:
-        st.error(f"Yahoo feed error: {e}")
+        st.error(f"Live scanner error: {e}")
 
 st.divider()
 
@@ -147,13 +237,11 @@ st.write("Current stage:")
 st.write("✅ Strategy selected")
 st.write("✅ Paper trade structure ready")
 st.write("✅ Yahoo demo live feed")
-st.write("⬜ Live signal calculation")
+st.write("✅ Live indicator table")
+st.write("✅ Live signal calculation")
 st.write("⬜ Telegram alert")
 st.write("⬜ Angel One connection")
 st.write("⬜ Real order execution")
-
-st.subheader("🚨 Signal Box")
-st.warning("Signal calculation will be connected in the next step.")
 
 st.subheader("📋 Forward Test Rules")
 
