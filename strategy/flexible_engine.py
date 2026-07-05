@@ -38,6 +38,9 @@ def run_flexible_strategy(
     atr_threshold=0.0,
     gamma_filter_enabled=False,
     gamma_threshold=0.0,
+    rsi_filter_enabled=False,
+    rsi_min=0.0,
+    rsi_max=100.0,
 ):
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
@@ -87,6 +90,10 @@ def run_flexible_strategy(
                 ce_condition = ce_condition and row["Gamma_Momentum"] >= gamma_threshold
                 pe_condition = pe_condition and row["Gamma_Momentum"] <= -gamma_threshold
 
+            if rsi_filter_enabled:
+                 ce_condition = ce_condition and rsi_min <= row["RSI14"] <= rsi_max
+                 pe_condition = pe_condition and rsi_min <= row["RSI14"] <= rsi_max
+            
             if ce_condition:
                 trade = {
                     "date": trade_date,
