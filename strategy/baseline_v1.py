@@ -18,7 +18,6 @@ def run_baseline_v1(df):
 
     for trade_date, day in df.groupby("trade_date"):
         day = day.sort_values("datetime").reset_index(drop=True)
-
         signal_rows = day[day["trade_time_str"] >= ENTRY_TIME]
 
         if signal_rows.empty:
@@ -27,6 +26,7 @@ def run_baseline_v1(df):
         trade = None
 
         for idx, row in signal_rows.iterrows():
+
             if (
                 row["ATR_Slope"] > 0
                 and row["Gamma_Momentum"] > 0
@@ -39,6 +39,9 @@ def run_baseline_v1(df):
                     "entry_time": row["datetime"],
                     "entry_price": row["close"],
                     "entry_index": idx,
+                    "entry_ema_slope": row["EMA_Slope"],
+                    "entry_atr_slope": row["ATR_Slope"],
+                    "entry_gamma": row["Gamma_Momentum"],
                 }
                 break
 
@@ -54,6 +57,9 @@ def run_baseline_v1(df):
                     "entry_time": row["datetime"],
                     "entry_price": row["close"],
                     "entry_index": idx,
+                    "entry_ema_slope": row["EMA_Slope"],
+                    "entry_atr_slope": row["ATR_Slope"],
+                    "entry_gamma": row["Gamma_Momentum"],
                 }
                 break
 
