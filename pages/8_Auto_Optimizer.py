@@ -54,4 +54,114 @@ ranking_method = st.selectbox(
 )
 
 if st.button("🚀 Run Auto Optimization"):
-    st.write("Optimizer button is working.")
+
+    results = []
+
+    sl_values = list(range(int(sl_from), int(sl_to) + 1, int(sl_step)))
+    target_values = list(range(int(target_from), int(target_to) + 1, int(target_step)))
+
+    total_tests = (
+        len(sl_values)
+        * len(target_values)
+        * len(ema_values)
+        * len(atr_values)
+        * len(gamma_values)
+        * len(rsi_ranges)
+    )
+
+    st.write(f"Total combinations: **{total_tests}**")
+
+    progress = st.progress(0)
+    count = 0
+
+    for sl in sl_values:
+        for target in target_values:
+            for ema in ema_values:
+                for atr in atr_values:
+                    for gamma in gamma_values:
+                        for rsi_min, rsi_max in rsi_ranges:
+
+                            summary, trade_log = run_flexible_strategy(
+                                df,
+                                sl_points=sl,
+                                target_points=target,
+                                allow_ce=allow_ce,
+                                allow_pe=allow_pe,
+                                ema_filter_enabled=use_ema,
+                                ema_threshold=ema,
+                                atr_filter_enabled=use_atr,
+                                atr_threshold=atr,
+                                gamma_filter_enabled=use_gamma,
+                                gamma_threshold=gamma,
+                                rsi_filter_enabled=use_rsi,
+                                rsi_min=rsi_min,
+                                rsi_max=rsi_max,
+                            )
+
+                            if summary:
+                                results.append({
+                                    "SL": sl,
+                                    "Target": target,
+                                    "EMA": ema,
+                                    "ATR": atr,
+                                    "Gamma": gamma,
+                                    "RSI Min": rsi_min,
+                                    "RSI Max": rsi_max,
+                                    "Trades": summary["trades"],
+                                    "Win Rate %": summary["win_rate"],
+                                    "Net Points": summary["net_points"],
+                                    "Profit Factor": summary["profit_factor"],
+                                    "Max DD": summary["max_drawdown"],
+                                    "CE Trades": summary["ce_trades"],
+                                    "PE Trades": summary["pe_trades"],
+                                })
+
+                            count += 1
+                            progress.progress(count / total_tests)
+
+    results_df = pd.DataFrame(results)
+
+    if results_df.empty:
+        st.error("No valid results found.")
+        st.stop()
+
+    if ranking_method == "Profit Factor":
+        results_df = results_df.sort_values(["Profit Factor", "Net Points"], ascending=[False, False])
+    elif ranking_method == "Net Points":
+        results_df = results_df.sort_values(["Net Points", "Profit Factor"], ascending=[False, False])
+    elif ranking_method == "Win Rate %":
+        results_df = results_df.sort_values(["Win Rate %", "Profit Factor"], ascending=[False, False])
+    else:
+        results_df["Drawdown Abs"] = results_df["Max DD"].abs()
+        results_df = results_df.sort_values(["Drawdown Abs", "Profit Factor"], ascending=[True, False])
+        results_df = results_df.drop(columns=["Drawdown Abs"])
+
+    results_df = results_df.reset_index(drop=True)
+    results_df.insert(0, "Rank", results_df.index + 1)
+
+    st.subheader("🏆 Top 50 Results")
+    st.dataframe(results_df.head(50), use_container_width=True, hide_index=True)
+
+    st.subheader("🥇 Best Setup")
+    best = results_df.iloc[0]
+
+    col1, col2 = st.columns(2)
+    col1.metric("Best SL", int(best["SL"]))
+    col2.metric("Best Target", int(best["Target"]))
+
+    col3, col4 = st.columns(2)
+    col3.metric("Win Rate", f'{best["Win Rate %"]}%')
+    col4.metric("Profit Factor", best["Profit Factor"])
+
+    col5, col6 = st.columns(2)
+    col5.metric("Net Points", best["Net Points"])
+    col6.metric("Max DD", best["Max DD"])
+
+    csv = results_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download Full Results CSV",
+        data=csv,
+        file_name="auto_optimizer_results.csv",
+        mime="text/csv"
+    )
