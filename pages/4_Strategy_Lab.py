@@ -12,20 +12,43 @@ if "df" not in st.session_state:
 
 df = st.session_state["df"]
 
-st.subheader("⚙️ Parameters")
+with st.expander("📌 Entry Settings", expanded=True):
+    allow_ce = st.checkbox("Allow CE Trades", value=True)
+    allow_pe = st.checkbox("Allow PE Trades", value=True)
 
-sl_points = st.number_input("Stop Loss Points", min_value=5, max_value=200, value=50, step=5)
-target_points = st.number_input("Target Points", min_value=5, max_value=300, value=100, step=5)
+with st.expander("📈 Filters", expanded=True):
+    ema_filter_enabled = st.checkbox("Enable EMA Slope Filter", value=False)
+    ema_threshold = st.number_input(
+        "Minimum EMA Slope",
+        min_value=0.0,
+        max_value=10.0,
+        value=0.5,
+        step=0.1
+    )
 
-st.subheader("📌 Trade Direction")
-allow_ce = st.checkbox("Allow CE Trades", value=True)
-allow_pe = st.checkbox("Allow PE Trades", value=True)
+    st.caption("EMA filter UI is ready. Full EMA filtering will be connected after entry EMA slope is added to trade log.")
 
-st.subheader("📈 EMA Filter")
-ema_filter_enabled = st.checkbox("Enable EMA Slope Filter", value=False)
-ema_threshold = st.number_input("Minimum EMA Slope", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
+with st.expander("⚙️ Risk Management", expanded=True):
+    sl_points = st.number_input(
+        "Stop Loss Points",
+        min_value=5,
+        max_value=200,
+        value=50,
+        step=5
+    )
+
+    target_points = st.number_input(
+        "Target Points",
+        min_value=5,
+        max_value=300,
+        value=100,
+        step=5
+    )
+
+st.divider()
 
 if st.button("▶️ Run Strategy Test"):
+
     summary, trade_log = run_flexible_strategy(
         df,
         sl_points=sl_points,
@@ -59,4 +82,8 @@ if st.button("▶️ Run Strategy Test"):
     st.line_chart(trade_log["equity"])
 
     st.subheader("📋 Trade Log")
-    st.dataframe(trade_log, use_container_width=True, hide_index=True)
+    st.dataframe(
+        trade_log,
+        use_container_width=True,
+        hide_index=True
+    )
