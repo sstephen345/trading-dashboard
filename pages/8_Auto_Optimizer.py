@@ -32,4 +32,5 @@ sl_to = st.number_input("SL To", value=50, step=5)
 sl_step = st.number_input("SL Step", value=5, step=5)
 
 target_from = st.number_input("Target From", value=20, step=10)
-target_to = st.number
+target_to = st.number_input("Target To", value=100, step=10)
+target_step = st.number_input("Target Step", value=10, step=10)
