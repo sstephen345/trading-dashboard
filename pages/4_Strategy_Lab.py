@@ -29,7 +29,23 @@ with st.expander("📈 Entry Filters", expanded=True):
         step=0.1,
     )
 
-    st.caption("EMA filter will work after entry EMA values are stored in the trade log.")
+    atr_filter_enabled = st.checkbox("Enable ATR Slope Filter", value=False)
+    atr_threshold = st.number_input(
+        "Minimum ATR Slope",
+        min_value=0.0,
+        max_value=10.0,
+        value=0.0,
+        step=0.1,
+    )
+
+    gamma_filter_enabled = st.checkbox("Enable Gamma Momentum Filter", value=False)
+    gamma_threshold = st.number_input(
+        "Minimum Gamma Momentum",
+        min_value=0.0,
+        max_value=10.0,
+        value=0.0,
+        step=0.1,
+    )
 
 with st.expander("⚙️ Risk Management", expanded=True):
     sl_points = st.number_input(
@@ -59,6 +75,10 @@ if st.button("▶️ Run Single Test"):
         allow_pe=allow_pe,
         ema_filter_enabled=ema_filter_enabled,
         ema_threshold=ema_threshold,
+        atr_filter_enabled=atr_filter_enabled,
+        atr_threshold=atr_threshold,
+        gamma_filter_enabled=gamma_filter_enabled,
+        gamma_threshold=gamma_threshold,
     )
 
     if not summary:
@@ -103,10 +123,11 @@ with st.expander("🧠 SL / Target Optimizer", expanded=False):
     if st.button("🔍 Optimize Strategy"):
         results = []
 
-        sl_values = range(int(sl_from), int(sl_to) + 1, int(sl_step))
-        target_values = range(int(target_from), int(target_to) + 1, int(target_step))
+        total_tests = (
+            len(range(int(sl_from), int(sl_to) + 1, int(sl_step)))
+            * len(range(int(target_from), int(target_to) + 1, int(target_step)))
+        )
 
-        total_tests = len(list(sl_values)) * len(list(target_values))
         progress = st.progress(0)
         test_count = 0
 
@@ -120,6 +141,10 @@ with st.expander("🧠 SL / Target Optimizer", expanded=False):
                     allow_pe=allow_pe,
                     ema_filter_enabled=ema_filter_enabled,
                     ema_threshold=ema_threshold,
+                    atr_filter_enabled=atr_filter_enabled,
+                    atr_threshold=atr_threshold,
+                    gamma_filter_enabled=gamma_filter_enabled,
+                    gamma_threshold=gamma_threshold,
                 )
 
                 if summary:
