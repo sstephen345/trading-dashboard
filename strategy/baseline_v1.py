@@ -18,6 +18,7 @@ def run_baseline_v1(df):
 
     for trade_date, day in df.groupby("trade_date"):
         day = day.sort_values("datetime").reset_index(drop=True)
+
         signal_rows = day[day["trade_time_str"] >= ENTRY_TIME]
 
         if signal_rows.empty:
