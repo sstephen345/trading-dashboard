@@ -78,7 +78,12 @@ if st.button("🔄 Fetch Demo Live Data"):
         st.subheader("📡 Current Market Snapshot")
         col1, col2 = st.columns(2)
         col1.metric("Latest Close", round(float(latest["Close"]), 2))
-        col2.metric("Latest Time", str(latest.iloc[0]))
+        close_value = latest["Close"]
+        
+        if isinstance(close_value, pd.Series):
+            close_value = close_value.iloc[0]
+        
+        col1.metric("Latest Close", round(float(close_value), 2))
 
         st.info("This is only demo market data. Strategy signal calculation will be connected next.")
 
