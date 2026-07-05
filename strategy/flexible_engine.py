@@ -35,6 +35,10 @@ def run_flexible_strategy(
     allow_pe=True,
     ema_filter_enabled=False,
     ema_threshold=0.0,
+    atr_filter_enabled=False,
+    atr_threshold=0.0,
+    gamma_filter_enabled=False,
+    gamma_threshold=0.0,
 ):
     old_sl = baseline.SL_POINTS
     old_target = baseline.TARGET_POINTS
@@ -61,6 +65,18 @@ def run_flexible_strategy(
             ((trade_log["type"] == "CE") & (trade_log["entry_ema_slope"] >= ema_threshold))
             |
             ((trade_log["type"] == "PE") & (trade_log["entry_ema_slope"] <= -ema_threshold))
+        ]
+
+    if atr_filter_enabled:
+        trade_log = trade_log[
+            trade_log["entry_atr_slope"] >= atr_threshold
+        ]
+
+    if gamma_filter_enabled:
+        trade_log = trade_log[
+            ((trade_log["type"] == "CE") & (trade_log["entry_gamma"] >= gamma_threshold))
+            |
+            ((trade_log["type"] == "PE") & (trade_log["entry_gamma"] <= -gamma_threshold))
         ]
 
     summary = calculate_summary(trade_log)
