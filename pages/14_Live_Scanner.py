@@ -11,12 +11,18 @@ except ImportError:
 
 st.set_page_config(page_title="Live Scanner", page_icon="📡")
 
-st.title("📡 Live Scanner / Paper Trading")
-st.write("Demo live-data scanner using Yahoo Finance. No real orders are placed.")
+st.title("📡 Live Signal Engine")
+st.write("Live scanner with signal history. No real orders are placed.")
 
 if "df" not in st.session_state:
     st.warning("Please upload Excel from Dashboard first.")
     st.stop()
+
+if "signal_history" not in st.session_state:
+    st.session_state["signal_history"] = []
+
+if "last_signal_candle" not in st.session_state:
+    st.session_state["last_signal_candle"] = None
 
 df = st.session_state["df"].copy()
 df["date"] = pd.to_datetime(df["date"])
@@ -49,7 +55,64 @@ symbol = st.selectbox(
 interval = st.selectbox("Interval", ["1m", "5m", "15m"], index=0)
 period = st.selectbox("Period", ["1d", "5d"], index=0)
 
-if st.button("🔄 Fetch Demo Live Data"):
+
+def calculate_confidence(latest, signal):
+    score = 50
+
+    if abs(float(latest["EMA_Slope"])) >= ema_threshold:
+        score += 15
+
+    if float(latest["ATR_Slope"]) > 0:
+        score += 15
+
+    if signal == "BUY CE" and float(latest["Gamma_Momentum"]) > 0:
+        score += 10
+
+    if signal == "BUY PE" and float(latest["Gamma_Momentum"]) < 0:
+        score += 10
+
+    rsi = float(latest["RSI14"])
+    if 40 <= rsi <= 70:
+        score += 10
+
+    return min(score, 100)
+
+
+def get_live_signal(latest):
+    ce_ok = (
+        allow_ce
+        and latest["ATR_Slope"] > 0
+        and latest["Gamma_Momentum"] > 0
+        and latest["EMA_Slope"] > 0
+        and latest["close"] > latest["EMA20"]
+    )
+
+    pe_ok = (
+        allow_pe
+        and latest["ATR_Slope"] > 0
+        and latest["Gamma_Momentum"] < 0
+        and latest["EMA_Slope"] < 0
+        and latest["close"] < latest["EMA20"]
+    )
+
+    if ema_filter_enabled:
+        ce_ok = ce_ok and latest["EMA_Slope"] >= ema_threshold
+        pe_ok = pe_ok and latest["EMA_Slope"] <= -ema_threshold
+
+    if rsi_filter_enabled:
+        ce_ok = ce_ok and rsi_min <= latest["RSI14"] <= rsi_max
+        pe_ok = pe_ok and rsi_min <= latest["RSI14"] <= rsi_max
+
+    if ce_ok:
+        return "BUY CE"
+
+    if pe_ok:
+        return "BUY PE"
+
+    return "NO TRADE"
+
+
+if st.button("🔄 Scan Latest Candle"):
 
     if yf is None:
         st.error("yfinance is not installed. Add yfinance to requirements.txt and reboot app.")
@@ -78,15 +141,17 @@ if st.button("🔄 Fetch Demo Live Data"):
 
         indicator_df = build_live_indicator_table(live_df)
 
-        st.success(f"✅ Live indicator table built for {symbol}")
-
         latest = indicator_df.iloc[-1]
+        candle_time = str(latest["datetime"])
+        close_price = float(latest["close"])
+
+        signal = get_live_signal(latest)
 
         st.subheader("📡 Current Market Snapshot")
 
         col1, col2 = st.columns(2)
-        col1.metric("Latest Close", round(float(latest["close"]), 2))
-        col2.metric("Current Signal", latest["Signal"])
+        col1.metric("Latest Close", round(close_price, 2))
+        col2.metric("Signal", signal)
 
         col3, col4 = st.columns(2)
         col3.metric("EMA Slope", round(float(latest["EMA_Slope"]), 3))
@@ -96,64 +161,56 @@ if st.button("🔄 Fetch Demo Live Data"):
         col5.metric("ATR Slope", round(float(latest["ATR_Slope"]), 3))
         col6.metric("Gamma", round(float(latest["Gamma_Momentum"]), 3))
 
-        st.subheader("🧠 Live Rule Check")
-
-        ce_ok = (
-            allow_ce
-            and latest["ATR_Slope"] > 0
-            and latest["Gamma_Momentum"] > 0
-            and latest["EMA_Slope"] > 0
-            and latest["close"] > latest["EMA20"]
-        )
-
-        pe_ok = (
-            allow_pe
-            and latest["ATR_Slope"] > 0
-            and latest["Gamma_Momentum"] < 0
-            and latest["EMA_Slope"] < 0
-            and latest["close"] < latest["EMA20"]
-        )
-
-        if ema_filter_enabled:
-            ce_ok = ce_ok and latest["EMA_Slope"] >= ema_threshold
-            pe_ok = pe_ok and latest["EMA_Slope"] <= -ema_threshold
-
-        if rsi_filter_enabled:
-            ce_ok = ce_ok and rsi_min <= latest["RSI14"] <= rsi_max
-            pe_ok = pe_ok and rsi_min <= latest["RSI14"] <= rsi_max
-
-        if ce_ok:
-            signal = "BUY CE"
-            entry = float(latest["close"])
-            sl = entry - sl_points
-            target = entry + target_points
-            st.success("🟢 BUY CE Signal")
-
-        elif pe_ok:
-            signal = "BUY PE"
-            entry = float(latest["close"])
-            sl = entry + sl_points
-            target = entry - target_points
-            st.error("🔴 BUY PE Signal")
-
-        else:
-            signal = "NO TRADE"
-            entry = None
-            sl = None
-            target = None
-            st.warning("⚪ NO TRADE")
-
         st.subheader("🚨 Signal Box")
 
-        if signal != "NO TRADE":
+        if signal == "NO TRADE":
+            st.warning("⚪ No trade. Conditions not satisfied.")
+        else:
+            entry = close_price
+
+            if signal == "BUY CE":
+                sl = entry - sl_points
+                target = entry + target_points
+                st.success("🟢 BUY CE Signal")
+            else:
+                sl = entry + sl_points
+                target = entry - target_points
+                st.error("🔴 BUY PE Signal")
+
+            confidence = calculate_confidence(latest, signal)
+
             col1, col2, col3 = st.columns(3)
             col1.metric("Entry", round(entry, 2))
             col2.metric("SL", round(sl, 2))
             col3.metric("Target", round(target, 2))
-        else:
-            st.write("Conditions not satisfied.")
+
+            st.metric("Confidence", f"{confidence}%")
+
+            if st.session_state["last_signal_candle"] != candle_time:
+                st.session_state["signal_history"].append(
+                    {
+                        "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "symbol": symbol,
+                        "candle_time": candle_time,
+                        "signal": signal,
+                        "entry": round(entry, 2),
+                        "sl": round(sl, 2),
+                        "target": round(target, 2),
+                        "confidence": confidence,
+                        "status": "OPEN PAPER",
+                        "ema_slope": round(float(latest["EMA_Slope"]), 4),
+                        "rsi": round(float(latest["RSI14"]), 2),
+                        "atr_slope": round(float(latest["ATR_Slope"]), 4),
+                        "gamma": round(float(latest["Gamma_Momentum"]), 4),
+                    }
+                )
+                st.session_state["last_signal_candle"] = candle_time
+                st.success("✅ New paper signal added to history.")
+            else:
+                st.info("Duplicate candle ignored. Signal already recorded for this candle.")
 
         st.subheader("📊 Latest Indicator Table")
+
         display_cols = [
             "datetime",
             "open",
@@ -174,11 +231,36 @@ if st.button("🔄 Fetch Demo Live Data"):
         st.dataframe(
             indicator_df[display_cols].tail(30),
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
         )
 
     except Exception as e:
-        st.error(f"Live scanner error: {e}")
+        st.error(f"Live signal engine error: {e}")
+
+st.divider()
+
+st.subheader("📋 Live Signal History")
+
+history_df = pd.DataFrame(st.session_state["signal_history"])
+
+if history_df.empty:
+    st.info("No live paper signals recorded yet.")
+else:
+    st.dataframe(history_df, use_container_width=True, hide_index=True)
+
+    csv = history_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download Signal History",
+        data=csv,
+        file_name="live_signal_history.csv",
+        mime="text/csv",
+    )
+
+    if st.button("🧹 Clear Signal History"):
+        st.session_state["signal_history"] = []
+        st.session_state["last_signal_candle"] = None
+        st.success("Signal history cleared. Refresh page to update.")
 
 st.divider()
 
@@ -239,6 +321,7 @@ st.write("✅ Paper trade structure ready")
 st.write("✅ Yahoo demo live feed")
 st.write("✅ Live indicator table")
 st.write("✅ Live signal calculation")
+st.write("✅ Signal history")
 st.write("⬜ Telegram alert")
 st.write("⬜ Angel One connection")
 st.write("⬜ Real order execution")
